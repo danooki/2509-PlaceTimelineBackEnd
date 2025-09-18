@@ -1,18 +1,22 @@
 {
   "name": "2509-placetimelinebackend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Timeline generator MPV backend",
   "main": "index.js",
   "scripts": {
     "dev": "node --watch --env-file=.env index.js",
-    "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
   "keywords": [],
   "author": "Daniel Fuentealba",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
-    "express": "5.1.0"
+    "axios": "^1.12.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "openai": "^5.21.0"
   }
 }
