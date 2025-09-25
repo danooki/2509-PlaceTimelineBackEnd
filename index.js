@@ -17,10 +17,13 @@ const port = process.env.PORT;
 
 // Apply middleware
 app.use(corsMiddleware);
-app.use(rateLimiter);
 
 // Routes
 app.use("/health", healthRoutes); // endpoint for backend health check
+
+// TODO: When you create Wikipedia/AI search routes, apply rate limiter only to those specific routes
+// Example: app.use("/api/search", rateLimiter, searchRoutes);
+// This way users can reload the website freely, but Wikipedia/AI calls are rate limited
 
 // 404 handler for unknown routes
 app.use((req, res) => res.status(404).json({ error: "Not found" }));
