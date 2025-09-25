@@ -8,6 +8,7 @@ import errorHandler from "./middleware/errorHandler.js";
 
 // Import routes
 import healthRoutes from "./routes/health.js";
+import timelineCreatorRoutes from "./routes/timelineCreator.js";
 
 const app = express(); // Create Express application
 app.use(express.json()); // Enables JSON parsing for POST requests
@@ -20,10 +21,7 @@ app.use(corsMiddleware);
 
 // Routes
 app.use("/health", healthRoutes); // endpoint for backend health check
-
-// TODO: When you create Wikipedia/AI search routes, apply rate limiter only to those specific routes
-// Example: app.use("/api/search", rateLimiter, searchRoutes);
-// This way users can reload the website freely, but Wikipedia/AI calls are rate limited
+app.use("/api/timeline", rateLimiter, timelineCreatorRoutes); // timeline creator with rate limiting
 
 // 404 handler for unknown routes
 app.use((req, res) => res.status(404).json({ error: "Not found" }));

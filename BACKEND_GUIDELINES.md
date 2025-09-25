@@ -8,12 +8,20 @@ Development standards and best practices for the Place Timeline backend.
 Backend Structure:
 ├── services/          # External API integrations
 ├── routes/            # API endpoints
+├── controllers/       # Request/response handling logic
 ├── middleware/        # Cross-cutting concerns
 ├── utils/             # Configuration and utilities
 └── index.js          # Main server file
 ```
 
 **Note**: This backend uses ESM syntax with `import`/`export` statements.
+
+## Code Organization Principles
+
+- **File Size**: Keep files under 200 lines of code
+- **Modularity**: Maintain clear separation of concerns between services, controllers, routes, and middleware
+- **Simplicity**: Prioritize simple, readable code over complex optimizations
+- **Avoid Redundancy**: Don't repeat code - extract common functionality into utilities or services
 
 ## Development Standards
 

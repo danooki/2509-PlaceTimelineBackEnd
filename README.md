@@ -34,6 +34,7 @@ npm run dev
 │   └── wikiService.js # Wikipedia API service
 ├── routes/            # API endpoints
 │   └── health.js      # Health check endpoint
+├── controllers/       # Request/response handling logic
 ├── middleware/        # Cross-cutting concerns
 │   ├── cors.js        # CORS configuration
 │   ├── rateLimiter.js # Rate limiting
