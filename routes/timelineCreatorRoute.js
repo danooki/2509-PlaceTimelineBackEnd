@@ -1,6 +1,6 @@
 import express from "express";
-import wikiService from "../services/wikiService.js";
-import openaiService from "../services/openaiService.js";
+import { searchArticle } from "../services/wikiService.js";
+import { extractDates } from "../services/aimlapiService.js";
 
 const router = express.Router();
 
@@ -26,14 +26,11 @@ router.post("/", async (req, res) => {
 
     // Step 1: Get Wikipedia data
     console.log(`Searching Wikipedia for: "${cleanQuery}"`);
-    const wikiData = await wikiService.searchArticle(cleanQuery);
+    const wikiData = await searchArticle(cleanQuery);
 
-    // Step 2: Extract dates using OpenAI
+    // Step 2: Extract dates using AI/ML API
     console.log(`Extracting dates for: "${wikiData.name}"`);
-    const dateData = await openaiService.extractDates(
-      wikiData.summary,
-      wikiData.name
-    );
+    const dateData = await extractDates(wikiData.summary, wikiData.name);
 
     // Step 3: Combine and format response
     const timelineData = {

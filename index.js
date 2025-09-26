@@ -7,8 +7,9 @@ import rateLimiter from "./middleware/rateLimiter.js";
 import errorHandler from "./middleware/errorHandler.js";
 
 // Import routes
-import healthRoutes from "./routes/health.js";
-import timelineCreatorRoutes from "./routes/timelineCreator.js";
+import healthRoutes from "./routes/healthRoute.js";
+import timelineCreatorRoutes from "./routes/timelineCreatorRoute.js";
+import searchSuggestionsRoutes from "./routes/searchSuggestionsRoute.js";
 
 const app = express(); // Create Express application
 app.use(express.json()); // Enables JSON parsing for POST requests
@@ -21,6 +22,7 @@ app.use(corsMiddleware);
 
 // Routes
 app.use("/health", healthRoutes); // endpoint for backend health check
+app.use("/api/search/suggestions", rateLimiter, searchSuggestionsRoutes); // search suggestions with rate limiting
 app.use("/api/timeline", rateLimiter, timelineCreatorRoutes); // timeline creator with rate limiting
 
 // 404 handler for unknown routes

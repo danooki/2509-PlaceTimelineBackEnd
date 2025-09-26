@@ -121,7 +121,7 @@ curl -X POST http://localhost:3001/api/timeline \
 ### ✅ Phase 1: Backend Foundation
 
 - [x] WikiService - Wikipedia API integration
-- [ ] OpenAIService - Date extraction
+- [x] AIMLAPIService - Date extraction (via AI/ML API)
 - [ ] Timeline Route - Main API endpoint
 
 ### 🔄 Phase 2: Testing & Optimization

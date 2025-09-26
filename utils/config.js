@@ -11,10 +11,10 @@ const config = {
     frontendUrl: process.env.FRONTEND_URL || "http://localhost:50002",
   },
 
-  // OpenAI API settings
-  openai: {
-    apiKey: process.env.OPENAI_API_KEY,
-    model: process.env.OPENAI_MODEL,
+  // AI/ML API settings
+  aimlapi: {
+    apiKey: process.env.AIMLAPI_KEY,
+    model: process.env.AIMLAPI_MODEL,
   },
 
   // Wikipedia API settings
@@ -32,7 +32,7 @@ const config = {
 
 // Function to validate that required environment variables are present
 function validateConfig() {
-  const required = ["OPENAI_API_KEY"];
+  const required = ["AIMLAPI_KEY"];
 
   const missing = required.filter((key) => !process.env[key]);
 

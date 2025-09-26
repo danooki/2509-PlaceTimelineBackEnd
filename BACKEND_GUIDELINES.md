@@ -14,7 +14,99 @@ Backend Structure:
 └── index.js          # Main server file
 ```
 
-**Note**: This backend uses ESM syntax with `import`/`export` statements.
+## ES6+ Modern JavaScript Standards
+
+### 1. Prefer Functional Programming over Classes
+
+```javascript
+// ✅ Good: Functional approach with configuration
+const config = {
+  baseUrl: "https://en.wikipedia.org/api/rest_v1",
+  timeout: 5000,
+};
+
+export const searchArticle = async (query) => {
+  const summaryUrl = `${config.baseUrl}/page/summary/${encodeURIComponent(
+    query
+  )}`;
+  const response = await axios.get(summaryUrl, { timeout: config.timeout });
+  return response.data;
+};
+
+// ❌ Avoid: Class-based approach with this.property
+class WikiService {
+  constructor() {
+    this.baseUrl = "...";
+    this.timeout = 5000;
+  }
+  async searchArticle(query) {
+    const url = `${this.baseUrl}/...`;
+  }
+}
+```
+
+### 2. Use Configuration Objects
+
+```javascript
+// ✅ Good: Separate configuration from logic
+export const API_CONFIG = {
+  wikipedia: {
+    baseUrl: "https://en.wikipedia.org/api/rest_v1",
+    timeout: 5000,
+    userAgent: "PlaceTimeline/1.0",
+  },
+  openai: {
+    model: "gpt-3.5-turbo",
+    timeout: 10000,
+  },
+};
+
+// ✅ Good: Use configuration in functions
+export const searchWikipedia = async (query) => {
+  const response = await axios.get(
+    `${API_CONFIG.wikipedia.baseUrl}/page/summary/${query}`,
+    {
+      timeout: API_CONFIG.wikipedia.timeout,
+      headers: { "User-Agent": API_CONFIG.wikipedia.userAgent },
+    }
+  );
+  return response.data;
+};
+```
+
+### 3. Export Functions Directly
+
+```javascript
+// ✅ Good: Direct function exports
+export const searchSuggestions = async (query) => {
+  /* ... */
+};
+export const searchArticle = async (query) => {
+  /* ... */
+};
+
+// ❌ Avoid: Singleton class instances
+export default new WikiService();
+```
+
+### 4. Use Modern Error Handling
+
+```javascript
+// ✅ Good: Specific error types
+export class WikiApiError extends Error {
+  constructor(message, code, status) {
+    super(message);
+    this.name = "WikiApiError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
+// ✅ Good: Use custom errors
+if (error.response?.status === 404) {
+  throw new WikiApiError(`No article found for "${query}"`, "NOT_FOUND", 404);
+}
+```
 
 ## Code Organization Principles
 
