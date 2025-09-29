@@ -1,9 +1,11 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import axios from "axios";
-import {
-  extractCountryFromSummary,
-  calculateConfidence,
-  cleanSnippet,
-} from "./wikiTextProcessor.js";
+import { extractCountryFromSummary } from "../utils/wiki/countryExtraction.js";
+import { calculatePlaceConfidence } from "../utils/wiki/confidenceScoring.js";
+import { isPlace } from "../utils/wiki/placeDetection.js";
+import { cleanSnippet } from "../utils/wiki/textNormalization.js";
 import { WikiTimeoutError, WikiNotFoundError } from "./wikiErrors.js";
 
 // ─────────────────────────────────────────────────────────────
@@ -60,14 +62,21 @@ export const searchSuggestions = async (query) => {
 
     const searchResults = response.data.query.search;
 
-    // Process and enhance the search results
+    // Process and enhance the search results with place filtering
     const suggestions = await Promise.all(
       searchResults.map(async (result) => {
-        const confidence = calculateConfidence(
+        // Check if this is a place and calculate place-specific confidence
+        const placeCheck = isPlace(result.title, result.snippet);
+        const confidence = calculatePlaceConfidence(
           cleanQuery,
           result.title,
           result.snippet
         );
+
+        // Skip non-places (confidence will be 0)
+        if (!placeCheck.isPlace) {
+          return null;
+        }
 
         // Get additional info for each suggestion
         let thumbnail = null;
@@ -101,6 +110,8 @@ export const searchSuggestions = async (query) => {
           title: result.title,
           snippet: cleanSnippet(result.snippet),
           confidence: confidence,
+          placeType: placeCheck.placeType,
+          placeConfidence: placeCheck.confidence,
           thumbnail: thumbnail,
           country: country,
           size: result.size,
@@ -109,8 +120,13 @@ export const searchSuggestions = async (query) => {
       })
     );
 
+    // Filter out null results (non-places) and sort by confidence
+    const validSuggestions = suggestions.filter(
+      (suggestion) => suggestion !== null
+    );
+
     // Sort by confidence (highest first) and return top 3
-    return suggestions
+    return validSuggestions
       .sort((a, b) => b.confidence - a.confidence)
       .slice(0, RETURN_LIMIT);
   } catch (error) {

@@ -1,6 +1,6 @@
 import express from "express";
 import { searchArticle } from "../services/wikiService.js";
-import { extractDates } from "../services/aimlapiService.js";
+import { extractDates } from "../services/genaiService.js";
 
 const router = express.Router();
 
@@ -58,6 +58,7 @@ router.post("/", async (req, res) => {
     res.json(timelineData);
   } catch (error) {
     console.error(`Timeline creation failed: ${error.message}`);
+    console.error(`Error stack: ${error.stack}`);
 
     // Handle specific error types
     if (error.message.includes("not found")) {
@@ -84,11 +85,13 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Generic server error
+    // Generic server error with more details in development
+    const isDevelopment = process.env.NODE_ENV === "development";
     res.status(500).json({
       success: false,
       error: "Internal server error",
       code: "INTERNAL_ERROR",
+      ...(isDevelopment && { details: error.message }),
     });
   }
 });

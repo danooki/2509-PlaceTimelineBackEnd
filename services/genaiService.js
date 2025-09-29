@@ -1,15 +1,18 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import axios from "axios";
 
 // ─────────────────────────────────────────────────────────────
-//  AI/ML API Service - Handles AI-powered date extraction
+//  Google AI Service - Handles AI-powered date extraction
 // Extracts construction dates from Wikipedia summaries with precision levels
 // ─────────────────────────────────────────────────────────────
 
 // Configuration object following backend guidelines
-const AIMLAPI_CONFIG = {
-  baseUrl: "https://api.aimlapi.com/v1",
+const GENAI_CONFIG = {
+  baseUrl: "https://generativelanguage.googleapis.com/v1beta",
   timeout: 10000,
-  model: "gpt-3.5-turbo",
+  model: "gemini-2.0-flash-exp",
   maxTokens: 500,
   temperature: 0.1,
 };
@@ -43,78 +46,103 @@ export const extractDates = async (summary, placeName) => {
     const prompt = createDateExtractionPrompt(summary, placeName);
 
     // 3. Make API request
-    const response = await makeAIMLAPIRequest(prompt);
+    const response = await makeGoogleAIRequest(prompt);
 
     // 4. Parse and validate response
     const extractedData = parseAIResponse(response);
     return validateAndFormatDates(extractedData, placeName);
   } catch (error) {
+    // Log full error details for debugging
+    console.error("Google AI API Error Details:", {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      headers: error.response?.headers,
+    });
+
     // Handle specific error types
     if (error.code === "ECONNABORTED") {
-      throw new Error("AI/ML API timeout - please try again");
+      throw new Error("Google AI API timeout - please try again");
     }
 
     if (error.response?.status === 401) {
       throw new Error(
-        "AI/ML API key is invalid - please check your configuration"
+        "Google AI API key is invalid - please check your configuration"
       );
     }
 
     if (error.response?.status === 429) {
-      throw new Error("AI/ML API quota exceeded - please check your account");
+      throw new Error(
+        "Google AI API quota exceeded - please check your account"
+      );
     }
 
     if (error.response?.status >= 500) {
-      throw new Error("AI/ML API service temporarily unavailable");
+      throw new Error("Google AI API service temporarily unavailable");
     }
 
-    throw new Error(`AI/ML API processing failed: ${error.message}`);
+    throw new Error(`Google AI API processing failed: ${error.message}`);
   }
 };
 
 // ─────────────────────────────────────────────────────────────
-// Make HTTP request to AI/ML API
+// Make HTTP request to Google AI API
 //  @param {string} prompt - Formatted prompt for AI
 //  @returns {Promise<string>} - AI response content
 // ─────────────────────────────────────────────────────────────
-const makeAIMLAPIRequest = async (prompt) => {
-  const apiKey = process.env.AIMLAPI_KEY;
+const makeGoogleAIRequest = async (prompt) => {
+  const apiKey = process.env.GOOGLE_AI_API_KEY;
 
   if (!apiKey) {
-    throw new Error("AI/ML API key not configured");
+    throw new Error("Google AI API key not configured");
   }
 
+  console.log(
+    `Making Google AI API request with key: ${apiKey.substring(0, 8)}...`
+  );
+
   const requestData = {
-    model: AIMLAPI_CONFIG.model,
-    messages: [{ role: "user", content: prompt }],
-    max_tokens: AIMLAPI_CONFIG.maxTokens,
-    temperature: AIMLAPI_CONFIG.temperature,
+    contents: [
+      {
+        parts: [
+          {
+            text: prompt,
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      maxOutputTokens: GENAI_CONFIG.maxTokens,
+      temperature: GENAI_CONFIG.temperature,
+    },
   };
 
   const response = await axios.post(
-    `${AIMLAPI_CONFIG.baseUrl}/chat/completions`,
+    `${GENAI_CONFIG.baseUrl}/models/${GENAI_CONFIG.model}:generateContent?key=${apiKey}`,
     requestData,
     {
-      timeout: AIMLAPI_CONFIG.timeout,
+      timeout: GENAI_CONFIG.timeout,
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        "User-Agent": "PlaceTimeline/1.0",
       },
     }
   );
 
-  if (!response.data?.choices?.[0]?.message?.content) {
-    throw new Error("Invalid response format from AI/ML API");
+  if (!response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+    throw new Error("Invalid response format from Google AI API");
   }
 
-  return response.data.choices[0].message.content;
+  return response.data.candidates[0].content.parts[0].text;
 };
 
 // ─────────────────────────────────────────────────────────────
 // Create optimized prompt for date extraction
 //  @param {string} summary - Wikipedia summary text
 //  @param {string} placeName - Name of the place/building
-//  @returns {string} - Formatted prompt for AI/ML API
+//  @returns {string} - Formatted prompt for Google AI API
 // ─────────────────────────────────────────────────────────────
 const createDateExtractionPrompt = (summary, placeName) => {
   return `Extract construction dates for "${placeName}" from this Wikipedia summary. 
@@ -142,7 +170,7 @@ Extract dates for: ${placeName}`;
 
 // ─────────────────────────────────────────────────────────────
 // Parse AI response and extract JSON data
-//  @param {string} aiResponse - Raw response from AI/ML API
+//  @param {string} aiResponse - Raw response from Google AI API
 //  @returns {Object} - Parsed JSON data
 // ─────────────────────────────────────────────────────────────
 const parseAIResponse = (aiResponse) => {
