@@ -11,10 +11,9 @@ const config = {
     frontendUrl: process.env.FRONTEND_URL || "http://localhost:50002",
   },
 
-  // OpenAI API settings
-  openai: {
-    apiKey: process.env.OPENAI_API_KEY,
-    model: process.env.OPENAI_MODEL,
+  // Google AI API settings
+  googleAI: {
+    apiKey: process.env.GOOGLE_AI_API_KEY,
   },
 
   // Wikipedia API settings
@@ -28,11 +27,17 @@ const config = {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000, // 15 minutes
     maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
   },
+
+  // AI rate limiting settings (10 requests per hour)
+  aiRateLimit: {
+    windowMs: parseInt(process.env.AI_RATE_LIMIT_WINDOW_MS) || 3600000, // 1 hour
+    maxRequests: parseInt(process.env.AI_RATE_LIMIT_MAX_REQUESTS) || 10,
+  },
 };
 
 // Function to validate that required environment variables are present
 function validateConfig() {
-  const required = ["OPENAI_API_KEY"];
+  const required = ["GOOGLE_AI_API_KEY"];
 
   const missing = required.filter((key) => !process.env[key]);
 

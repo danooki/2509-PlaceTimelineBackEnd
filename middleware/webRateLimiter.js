@@ -1,8 +1,8 @@
 import rateLimit from "express-rate-limit";
 import config from "../utils/config.js";
 
-// Rate limiting middleware - Prevent abuse
-const rateLimiter = rateLimit({
+// Web API rate limiting middleware - Prevent abuse for general API endpoints
+const webRateLimiter = rateLimit({
   windowMs: config.rateLimit.windowMs, // Time window
   max: config.rateLimit.maxRequests, // Max requests per window
   message: {
@@ -13,4 +13,4 @@ const rateLimiter = rateLimit({
   legacyHeaders: false, // Disable legacy X-RateLimit headers
 });
 
-export default rateLimiter;
+export default webRateLimiter;

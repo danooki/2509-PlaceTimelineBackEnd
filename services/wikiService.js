@@ -1,150 +1,198 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import axios from "axios";
+import { extractCountryFromSummary } from "../utils/wiki/countryExtraction.js";
+import { calculatePlaceConfidence } from "../utils/wiki/confidenceScoring.js";
+import { isPlace } from "../utils/wiki/placeDetection.js";
+import { cleanSnippet } from "../utils/wiki/textNormalization.js";
+import { WikiTimeoutError, WikiNotFoundError } from "./wikiErrors.js";
 
 // ─────────────────────────────────────────────────────────────
-//  WikiService - Handles Wikipedia API integration
-// Provides methods to search and extract content from Wikipedia articles
+//  WikiService - Modern ES6+ Wikipedia API integration
+//  Uses functional programming with direct environment variable access
 // ─────────────────────────────────────────────────────────────
 
-class WikiService {
-  constructor() {
-    this.baseUrl = "https://en.wikipedia.org/api/rest_v1";
-    this.timeout = 5000; // 5 seconds timeout for Wikipedia API
-  }
+// Minimal configuration - main settings from .env file
+const WIKI_BASE_URL = process.env.WIKIPEDIA_API_BASE_URL;
+const WIKI_USER_AGENT = process.env.WIKIPEDIA_USER_AGENT;
+const WIKI_TIMEOUT = parseInt(process.env.WIKIPEDIA_TIMEOUT);
+const WIKI_BATCH_TIMEOUT = parseInt(process.env.WIKIPEDIA_BATCH_TIMEOUT);
+const SEARCH_LIMIT = parseInt(process.env.WIKIPEDIA_SEARCH_LIMIT);
+const RETURN_LIMIT = parseInt(process.env.WIKIPEDIA_RETURN_LIMIT);
 
-  // ─────────────────────────────────────────────────────────────
-  //  Search for a Wikipedia article by query - SINGLE METHOD APPROACH
-  //  @param {string} query - Search query (place name, building, etc.)
-  //  @returns {Promise<Object>} - Article summary with key info for timeline
-  // ─────────────────────────────────────────────────────────────
-  async searchArticle(query) {
-    try {
-      if (!query || typeof query !== "string" || query.trim().length === 0) {
-        throw new Error("Invalid search query");
-      }
+// Fixed constants (not configurable)
+const WIKI_SEARCH_URL = "https://en.wikipedia.org/w/api.php";
 
-      const cleanQuery = query.trim();
-
-      // Use Wikipedia Summary API for fastest response
-      const summaryUrl = `${this.baseUrl}/page/summary/${encodeURIComponent(
-        cleanQuery
-      )}`;
-
-      const response = await axios.get(summaryUrl, {
-        timeout: this.timeout,
-        headers: {
-          "User-Agent": "PlaceTimeline/1.0 (https://github.com/your-repo)",
-        },
-      });
-
-      if (response.data && response.data.title) {
-        return {
-          name: response.data.title,
-          summary: response.data.extract || "",
-          thumbnail: response.data.thumbnail?.source || null,
-          url: response.data.content_urls?.desktop?.page || null,
-          coordinates: response.data.coordinates || null,
-          type: response.data.type || null,
-          country:
-            this.extractCountryFromSummary(response.data.extract) || null,
-        };
-      }
-
-      throw new Error("No Wikipedia article found");
-    } catch (error) {
-      if (error.response?.status === 404) {
-        throw new Error(`No Wikipedia article found for "${query}"`);
-      }
-
-      if (error.code === "ECONNABORTED") {
-        throw new Error("Wikipedia API timeout - please try again");
-      }
-
-      throw new Error(`Wikipedia API error: ${error.message}`);
+// ─────────────────────────────────────────────────────────────
+//  Get search suggestions for a query - FUZZY MATCHING APPROACH
+//  @param {string} query - Search query (place name, building, etc.)
+//  @returns {Promise<Array>} - Array of search suggestions with confidence scores
+// ─────────────────────────────────────────────────────────────
+export const searchSuggestions = async (query) => {
+  try {
+    if (!query || typeof query !== "string" || query.trim().length === 0) {
+      throw new Error("Invalid search query");
     }
-  }
 
-  // ─────────────────────────────────────────────────────────────
-  // Extract country from Wikipedia summary text
-  //  @param {string} summary - Wikipedia article summary
-  //  @returns {string|null} - Country name or null if not found
-  // ─────────────────────────────────────────────────────────────
-  extractCountryFromSummary(summary) {
-    if (!summary) return null;
+    const cleanQuery = query.trim();
+    console.log(`Getting search suggestions for: "${cleanQuery}"`);
 
-    // Common country patterns in Wikipedia summaries
-    const countryPatterns = [
-      // "in [Country]" patterns
-      /\bin\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*[,.]/g,
-      // "of [Country]" patterns
-      /\bof\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*[,.]/g,
-      // "located in [Country]" patterns
-      /\blocated\s+in\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*[,.]/g,
-    ];
+    // Use Wikipedia's search API for fuzzy matching
+    const params = new URLSearchParams({
+      action: "query",
+      list: "search",
+      srsearch: cleanQuery,
+      srlimit: SEARCH_LIMIT,
+      srprop: "snippet|timestamp|size",
+      format: "json",
+      origin: "*",
+    });
 
-    // Common countries to look for
-    const commonCountries = [
-      "France",
-      "Germany",
-      "Italy",
-      "Spain",
-      "United Kingdom",
-      "United States",
-      "Japan",
-      "China",
-      "India",
-      "Brazil",
-      "Canada",
-      "Australia",
-      "Russia",
-      "Mexico",
-      "Argentina",
-      "Chile",
-      "Peru",
-      "Colombia",
-      "Venezuela",
-      "Egypt",
-      "South Africa",
-      "Nigeria",
-      "Kenya",
-      "Morocco",
-      "Tunisia",
-      "Turkey",
-      "Greece",
-      "Portugal",
-      "Netherlands",
-      "Belgium",
-      "Switzerland",
-      "Austria",
-      "Poland",
-      "Czech Republic",
-      "Hungary",
-      "Romania",
-      "Bulgaria",
-      "Sweden",
-      "Norway",
-      "Denmark",
-      "Finland",
-      "Iceland",
-      "Ireland",
-    ];
+    const response = await axios.get(`${WIKI_SEARCH_URL}?${params}`, {
+      timeout: WIKI_TIMEOUT,
+      headers: {
+        "User-Agent": WIKI_USER_AGENT,
+      },
+    });
 
-    for (const pattern of countryPatterns) {
-      const matches = summary.match(pattern);
-      if (matches) {
-        for (const match of matches) {
-          const country = match
-            .replace(/^(in|of|located in)\s+/i, "")
-            .replace(/[,.]$/, "")
-            .trim();
-          if (commonCountries.includes(country)) {
-            return country;
-          }
+    if (!response.data || !response.data.query || !response.data.query.search) {
+      return [];
+    }
+
+    const searchResults = response.data.query.search;
+
+    // Process and enhance the search results with place filtering
+    const suggestions = await Promise.all(
+      searchResults.map(async (result) => {
+        // Check if this is a place and calculate place-specific confidence
+        const placeCheck = isPlace(result.title, result.snippet);
+        const confidence = calculatePlaceConfidence(
+          cleanQuery,
+          result.title,
+          result.snippet
+        );
+
+        // Skip non-places (confidence will be 0)
+        if (!placeCheck.isPlace) {
+          return null;
         }
-      }
+
+        // Get additional info for each suggestion
+        let thumbnail = null;
+        let country = null;
+
+        try {
+          // Get summary for thumbnail and country info
+          const summaryUrl = `${WIKI_BASE_URL}/page/summary/${encodeURIComponent(
+            result.title
+          )}`;
+          const summaryResponse = await axios.get(summaryUrl, {
+            timeout: WIKI_BATCH_TIMEOUT,
+            headers: {
+              "User-Agent": WIKI_USER_AGENT,
+            },
+          });
+
+          if (summaryResponse.data) {
+            thumbnail = summaryResponse.data.thumbnail?.source || null;
+            country =
+              extractCountryFromSummary(summaryResponse.data.extract) || null;
+          }
+        } catch (error) {
+          // If summary fails, continue without thumbnail/country
+          console.log(
+            `Could not get summary for "${result.title}": ${error.message}`
+          );
+        }
+
+        return {
+          title: result.title,
+          snippet: cleanSnippet(result.snippet),
+          confidence: confidence,
+          placeType: placeCheck.placeType,
+          placeConfidence: placeCheck.confidence,
+          thumbnail: thumbnail,
+          country: country,
+          size: result.size,
+          timestamp: result.timestamp,
+        };
+      })
+    );
+
+    // Filter out null results (non-places) and sort by confidence
+    const validSuggestions = suggestions.filter(
+      (suggestion) => suggestion !== null
+    );
+
+    // Sort by confidence (highest first) and return top 3
+    return validSuggestions
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, RETURN_LIMIT);
+  } catch (error) {
+    if (error.code === "ECONNABORTED") {
+      throw new WikiTimeoutError();
     }
 
-    return null;
+    console.error(`Search suggestions failed: ${error.message}`);
+    throw new Error(`Search suggestions failed: ${error.message}`);
   }
-}
+};
 
-export default new WikiService();
+// ─────────────────────────────────────────────────────────────
+//  Search for a Wikipedia article by query - SINGLE METHOD APPROACH
+//  @param {string} query - Search query (place name, building, etc.)
+//  @returns {Promise<Object>} - Article summary with key info for timeline
+// ─────────────────────────────────────────────────────────────
+export const searchArticle = async (query) => {
+  try {
+    if (!query || typeof query !== "string" || query.trim().length === 0) {
+      throw new Error("Invalid search query");
+    }
+
+    const cleanQuery = query.trim();
+
+    // Use Wikipedia Summary API for fastest response
+    const summaryUrl = `${WIKI_BASE_URL}/page/summary/${encodeURIComponent(
+      cleanQuery
+    )}`;
+
+    const response = await axios.get(summaryUrl, {
+      timeout: WIKI_TIMEOUT,
+      headers: {
+        "User-Agent": WIKI_USER_AGENT,
+      },
+    });
+
+    if (response.data && response.data.title) {
+      return {
+        name: response.data.title,
+        summary: response.data.extract || "",
+        thumbnail: response.data.thumbnail?.source || null,
+        url: response.data.content_urls?.desktop?.page || null,
+        coordinates: response.data.coordinates || null,
+        type: response.data.type || null,
+        country: extractCountryFromSummary(response.data.extract) || null,
+      };
+    }
+
+    throw new WikiNotFoundError(query);
+  } catch (error) {
+    if (error.response?.status === 404) {
+      throw new WikiNotFoundError(query);
+    }
+
+    if (error.code === "ECONNABORTED") {
+      throw new WikiTimeoutError();
+    }
+
+    if (
+      error instanceof WikiNotFoundError ||
+      error instanceof WikiTimeoutError
+    ) {
+      throw error;
+    }
+
+    throw new Error(`Wikipedia API error: ${error.message}`);
+  }
+};
